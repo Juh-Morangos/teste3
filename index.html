@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Vendas Pro v8.4 - Cupom Térmico</title>
+    <title>Sistema de Vendas Pro v8.5 - Impressão Corrigida</title>
     <style>
         :root { --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --bg: #f3f4f6; --text: #1f2937; --info: #0ea5e9; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background-color: var(--bg); color: var(--text); }
@@ -59,31 +59,37 @@
         .report-item-header { font-weight: bold; border-bottom: 1px solid #eee; }
         .report-footer { border-top: 2px solid #000; font-weight: bold; font-size: 14px; margin-top: 10px; }
 
-        /* CONFIGURAÇÕES EXCLUSIVAS PARA IMPRESSORA TÉRMICA (80mm) */
+        /* Oculta a área de impressão na tela normal */
+        @media screen {
+            #receipt-print { display: none; }
+        }
+
+        /* CONFIGURAÇÕES EXCLUSIVAS PARA IMPRESSÃO (CORRIGIDO) */
         @media print {
             body * { visibility: hidden; }
+            .no-print { display: none !important; }
+            
             #receipt-print, #receipt-print * { visibility: visible; }
+            
             #receipt-print { 
+                display: block !important; /* CORREÇÃO AQUI: Força aparecer na impressão */
                 position: absolute; 
                 left: 0; 
                 top: 0; 
-                width: 80mm; /* Largura padrão de bobina térmica */
+                width: 80mm; /* Padrão, mas alterado no JS para A4 quando necessário */
                 padding: 2mm; 
                 color: black; 
                 background: white; 
-                font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada é melhor para cupom */
+                font-family: 'Courier New', Courier, monospace; 
                 font-size: 12px; 
             }
-            .no-print { display: none !important; }
         }
-        #receipt-print { display: none; }
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <header class="no-print">
-        <h2 style="margin:0">🚀 VendaFlow Pro</h2>
+        <h2 style="margin:0">🚀VAREJÃO PDV</h2>
         <nav>
             <button id="nav-home" onclick="navigate('home')">Início/Vendas</button>
             <button id="nav-produtos" onclick="navigate('produtos')">Produtos</button>
@@ -282,7 +288,7 @@
                     <button class="btn btn-primary" onclick="confirmarImpressaoAgrupada()">🖨️ Imprimir em A4</button>
                 </div>
             </div>
-            <p style="color: #666; font-size: 0.85rem; margin-top:0;">*Este relatório é otimizado para papel A4 normal, não para impressora térmica.</p>
+            <p style="color: #666; font-size: 0.85rem; margin-top:0;">*Este relatório será impresso usando toda a largura da página.</p>
             <div id="preview-relatorio-agrupado" style="border: 1px solid #ccc; padding: 20px; background: white; max-height: 60vh; overflow-y: auto;">
             </div>
         </div>
@@ -425,7 +431,6 @@
                 return matchBusca && matchData;
             }).reverse();
 
-            // AQUI ADICIONAMOS OS DOIS BOTÕES DE IMPRESSÃO NA TABELA
             tbody.innerHTML = filtradas.map(v => `
                 <tr style="${v.status === 'Cancelada' ? 'background: #fff5f5' : ''}">
                     <td style="text-align: center;"><input type="checkbox" class="check-venda" value="${v.id}"></td>
@@ -465,15 +470,13 @@
 
         // --- LÓGICA DE IMPRESSÃO (CUPOM TÉRMICO E RELATÓRIO) ---
         
-        // Chamado pelos botões da tabela 🖨️👤 e 🖨️📦
         function printReceipt(id, tipo) {
             const v = db.vendas.find(v => v.id === id);
             if(v) printReceiptObject(v, tipo);
         }
 
-        // Gera o HTML do Cupom Térmico (80mm)
         function printReceiptObject(v, tipo = 'cliente') {
-            // Remove limitação de largura no CSS temporariamente para evitar conflito se tentarmos imprimir A4 depois
+            // Garante largura térmica para o cupom
             document.getElementById('receipt-print').style.width = '80mm';
 
             let listaProdutosHtml = "";
@@ -483,10 +486,9 @@
                     listaProdutosHtml = v.carrinho.map(item => `${item.nome}<br>Qtd: ${item.qtd} x R$ ${item.unit.toFixed(2)} = R$ ${item.totalItem.toFixed(2)}`).join('<br><br>');
                 } else { listaProdutosHtml = v.itens; }
             } else {
-                // TIPO CARREGADOR - SEM PREÇO e COM CHECKBOX
                 if(v.carrinho && v.carrinho.length > 0) {
                     listaProdutosHtml = v.carrinho.map(item => `<b>[  ] ${item.qtd}x</b> - ${item.nome}`).join('<br><br>');
-                } else { listaProdutosHtml = v.itens; /* Vendas legadas */ }
+                } else { listaProdutosHtml = v.itens; }
             }
 
             let html = `
@@ -539,11 +541,14 @@
         function fecharModalImpressaoAgrupada() { document.getElementById('modal-impressao-agrupada').style.display = 'none'; }
         
         function confirmarImpressaoAgrupada() {
-            // Remove a trava de 80mm para imprimir o relatório grande corretamente na folha A4
+            // Remove a trava de 80mm para imprimir em tela cheia na folha A4
             document.getElementById('receipt-print').style.width = '100%';
             const htmlRelatorio = document.getElementById('preview-relatorio-agrupado').innerHTML;
             document.getElementById('receipt-print').innerHTML = htmlRelatorio;
             window.print();
+            
+            // Depois que a janela de impressão fecha, retorna para 80mm
+            setTimeout(() => { document.getElementById('receipt-print').style.width = '80mm'; }, 500);
         }
 
         function gerarHTMLRelatorioAgrupado(vendas) {
@@ -783,7 +788,6 @@
             closeSaleModal(); 
             renderSales();
 
-            // Interação Pós Venda
             if(!idEdit) {
                 setTimeout(() => {
                     if(confirm('Venda salva com sucesso!\n\nDeseja imprimir a VIA DO CLIENTE agora?')) {
