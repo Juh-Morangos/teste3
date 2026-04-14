@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Vendas Pro v8.5 - Impressão Corrigida</title>
+    <title>Sistema de Vendas Pro v8.6 - Filtro de Pagamento</title>
     <style>
         :root { --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --bg: #f3f4f6; --text: #1f2937; --info: #0ea5e9; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background-color: var(--bg); color: var(--text); }
@@ -25,7 +25,7 @@
 
         .card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem; }
         .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: flex-end; }
-        .form-group { flex: 1; display: flex; flex-direction: column; min-width: 150px; }
+        .form-group { flex: 1; display: flex; flex-direction: column; min-width: 120px; }
         label { margin-bottom: 0.4rem; font-weight: 600; font-size: 0.85rem; }
         input, select { padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; outline: none; }
         
@@ -59,24 +59,20 @@
         .report-item-header { font-weight: bold; border-bottom: 1px solid #eee; }
         .report-footer { border-top: 2px solid #000; font-weight: bold; font-size: 14px; margin-top: 10px; }
 
-        /* Oculta a área de impressão na tela normal */
         @media screen {
             #receipt-print { display: none; }
         }
 
-        /* CONFIGURAÇÕES EXCLUSIVAS PARA IMPRESSÃO (CORRIGIDO) */
         @media print {
             body * { visibility: hidden; }
             .no-print { display: none !important; }
-            
             #receipt-print, #receipt-print * { visibility: visible; }
-            
             #receipt-print { 
-                display: block !important; /* CORREÇÃO AQUI: Força aparecer na impressão */
+                display: block !important; 
                 position: absolute; 
                 left: 0; 
                 top: 0; 
-                width: 80mm; /* Padrão, mas alterado no JS para A4 quando necessário */
+                width: 80mm; 
                 padding: 2mm; 
                 color: black; 
                 background: white; 
@@ -89,7 +85,7 @@
 <body>
 
     <header class="no-print">
-        <h2 style="margin:0">🚀VAREJÃO PDV</h2>
+        <h2 style="margin:0">🚀 VendaFlow Pro</h2>
         <nav>
             <button id="nav-home" onclick="navigate('home')">Início/Vendas</button>
             <button id="nav-produtos" onclick="navigate('produtos')">Produtos</button>
@@ -124,6 +120,17 @@
                         <label>Vendedor:</label>
                         <select id="f-vendedor" onchange="renderSales()">
                             <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pagamento:</label>
+                        <select id="f-pgto" onchange="renderSales()">
+                            <option value="">Todos</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Cartão">Cartão</option>
+                            <option value="Prazo em Carteira">Prazo</option>
+                            <option value="Cheque">Cheque</option>
                         </select>
                     </div>
                     <div class="form-group"><label>Pesquisar:</label><input type="text" id="f-busca" placeholder="Cliente ou Nº" onkeyup="renderSales()"></div>
@@ -418,6 +425,8 @@
             const inicio = document.getElementById('f-inicio').value;
             const fim = document.getElementById('f-fim').value;
             const filtroVendedor = document.getElementById('f-vendedor').value;
+            const filtroPgto = document.getElementById('f-pgto').value; // NOVO FILTRO
+            
             document.getElementById('check-all-vendas').checked = false; 
 
             let filtradas = db.vendas.filter(v => {
@@ -426,8 +435,13 @@
                 const matchData = (!inicio || dataV >= inicio) && (!fim || dataV <= fim);
                 
                 if (filtroVendedor && v.vendedor !== filtroVendedor) return false;
+                
+                // NOVO: Verifica se a string de pagamento contém o texto do filtro (ex: 'PIX' acha 'Acertado (PIX)')
+                if (filtroPgto && !v.pagamento.includes(filtroPgto)) return false;
+
                 if (!verCanceladasGlobal && v.status === 'Cancelada') return false;
                 if (verCanceladasGlobal && v.status !== 'Cancelada') return false;
+                
                 return matchBusca && matchData;
             }).reverse();
 
@@ -451,6 +465,7 @@
                     </td>
                 </tr>
             `).join('');
+            
             updateDashboard(filtradas);
         }
 
@@ -476,7 +491,6 @@
         }
 
         function printReceiptObject(v, tipo = 'cliente') {
-            // Garante largura térmica para o cupom
             document.getElementById('receipt-print').style.width = '80mm';
 
             let listaProdutosHtml = "";
@@ -541,13 +555,11 @@
         function fecharModalImpressaoAgrupada() { document.getElementById('modal-impressao-agrupada').style.display = 'none'; }
         
         function confirmarImpressaoAgrupada() {
-            // Remove a trava de 80mm para imprimir em tela cheia na folha A4
             document.getElementById('receipt-print').style.width = '100%';
             const htmlRelatorio = document.getElementById('preview-relatorio-agrupado').innerHTML;
             document.getElementById('receipt-print').innerHTML = htmlRelatorio;
             window.print();
             
-            // Depois que a janela de impressão fecha, retorna para 80mm
             setTimeout(() => { document.getElementById('receipt-print').style.width = '80mm'; }, 500);
         }
 
