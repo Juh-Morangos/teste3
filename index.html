@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Vendas Pro v8.3</title>
+    <title>Sistema de Vendas Pro v8.4 - Cupom Térmico</title>
     <style>
         :root { --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b; --bg: #f3f4f6; --text: #1f2937; --info: #0ea5e9; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background-color: var(--bg); color: var(--text); }
@@ -59,10 +59,21 @@
         .report-item-header { font-weight: bold; border-bottom: 1px solid #eee; }
         .report-footer { border-top: 2px solid #000; font-weight: bold; font-size: 14px; margin-top: 10px; }
 
+        /* CONFIGURAÇÕES EXCLUSIVAS PARA IMPRESSORA TÉRMICA (80mm) */
         @media print {
             body * { visibility: hidden; }
             #receipt-print, #receipt-print * { visibility: visible; }
-            #receipt-print { position: absolute; left: 0; top: 0; width: 100%; padding: 5mm; color: black; background: white; }
+            #receipt-print { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 80mm; /* Largura padrão de bobina térmica */
+                padding: 2mm; 
+                color: black; 
+                background: white; 
+                font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada é melhor para cupom */
+                font-size: 12px; 
+            }
             .no-print { display: none !important; }
         }
         #receipt-print { display: none; }
@@ -72,7 +83,7 @@
 <body>
 
     <header class="no-print">
-        <h2 style="margin:0">VAREJÃO PERERECA PDV</h2>
+        <h2 style="margin:0">🚀 VendaFlow Pro</h2>
         <nav>
             <button id="nav-home" onclick="navigate('home')">Início/Vendas</button>
             <button id="nav-produtos" onclick="navigate('produtos')">Produtos</button>
@@ -95,7 +106,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
                     <h3 style="margin:0">Vendas</h3>
                     <div style="display:flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn btn-ghost" onclick="abrirModalImpressaoAgrupada()">🖨️ Imprimir Selecionadas</button>
+                        <button class="btn btn-ghost" onclick="abrirModalImpressaoAgrupada()">🖨️ Relatório em Lote</button>
                         <button id="btn-toggle-canceladas" class="btn btn-outline" onclick="toggleCanceladas()">Ver Canceladas</button>
                         <button class="btn btn-success" onclick="openSaleModal()">+ Nova Venda (F1)</button>
                     </div>
@@ -123,6 +134,7 @@
                                 <th>Total</th>
                                 <th>Pagamento</th>
                                 <th>Status</th>
+                                <th style="text-align: center;">Imprimir Cupom</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -264,12 +276,13 @@
     <div class="modal-overlay" id="modal-impressao-agrupada">
         <div class="modal" style="max-width: 1000px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
-                <h2 style="margin:0">Pré-visualização de Impressão</h2>
+                <h2 style="margin:0">Pré-visualização do Relatório</h2>
                 <div>
                     <button class="btn btn-ghost" onclick="fecharModalImpressaoAgrupada()" style="margin-right: 10px;">Cancelar</button>
-                    <button class="btn btn-primary" onclick="confirmarImpressaoAgrupada()">🖨️ Confirmar Impressão</button>
+                    <button class="btn btn-primary" onclick="confirmarImpressaoAgrupada()">🖨️ Imprimir em A4</button>
                 </div>
             </div>
+            <p style="color: #666; font-size: 0.85rem; margin-top:0;">*Este relatório é otimizado para papel A4 normal, não para impressora térmica.</p>
             <div id="preview-relatorio-agrupado" style="border: 1px solid #ccc; padding: 20px; background: white; max-height: 60vh; overflow-y: auto;">
             </div>
         </div>
@@ -412,6 +425,7 @@
                 return matchBusca && matchData;
             }).reverse();
 
+            // AQUI ADICIONAMOS OS DOIS BOTÕES DE IMPRESSÃO NA TABELA
             tbody.innerHTML = filtradas.map(v => `
                 <tr style="${v.status === 'Cancelada' ? 'background: #fff5f5' : ''}">
                     <td style="text-align: center;"><input type="checkbox" class="check-venda" value="${v.id}"></td>
@@ -422,6 +436,10 @@
                     <td><b>R$ ${v.total.toFixed(2)}</b></td>
                     <td>${v.pagamento}</td>
                     <td><span class="badge ${v.status === 'Ativa' ? 'badge-success' : 'badge-danger'}">${v.status}</span></td>
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button class="btn btn-ghost" onclick="printReceipt(${v.id}, 'cliente')" style="padding:4px 8px; font-size:1.1rem;" title="Via do Cliente (Com Preço)">🖨️👤</button>
+                        <button class="btn btn-ghost" onclick="printReceipt(${v.id}, 'carregador')" style="padding:4px 8px; font-size:1.1rem;" title="Via do Carregador (Sem Preço)">🖨️📦</button>
+                    </td>
                     <td>
                         ${v.status === 'Ativa' ? `<button class="btn btn-info" onclick="editSale(${v.id})" style="padding:4px" title="Editar">✏️</button>` : ''}
                         ${v.status === 'Ativa' ? `<button class="btn btn-danger" onclick="cancelSale(${v.id})" style="padding:4px" title="Cancelar">X</button>` : ''}
@@ -445,7 +463,67 @@
             document.getElementById('dash-pendente').innerText = `R$ ${tPendente.toFixed(2)}`;
         }
 
-        // --- LÓGICA DE IMPRESSÃO AGRUPADA ---
+        // --- LÓGICA DE IMPRESSÃO (CUPOM TÉRMICO E RELATÓRIO) ---
+        
+        // Chamado pelos botões da tabela 🖨️👤 e 🖨️📦
+        function printReceipt(id, tipo) {
+            const v = db.vendas.find(v => v.id === id);
+            if(v) printReceiptObject(v, tipo);
+        }
+
+        // Gera o HTML do Cupom Térmico (80mm)
+        function printReceiptObject(v, tipo = 'cliente') {
+            // Remove limitação de largura no CSS temporariamente para evitar conflito se tentarmos imprimir A4 depois
+            document.getElementById('receipt-print').style.width = '80mm';
+
+            let listaProdutosHtml = "";
+            
+            if (tipo === 'cliente') {
+                if(v.carrinho && v.carrinho.length > 0) {
+                    listaProdutosHtml = v.carrinho.map(item => `${item.nome}<br>Qtd: ${item.qtd} x R$ ${item.unit.toFixed(2)} = R$ ${item.totalItem.toFixed(2)}`).join('<br><br>');
+                } else { listaProdutosHtml = v.itens; }
+            } else {
+                // TIPO CARREGADOR - SEM PREÇO e COM CHECKBOX
+                if(v.carrinho && v.carrinho.length > 0) {
+                    listaProdutosHtml = v.carrinho.map(item => `<b>[  ] ${item.qtd}x</b> - ${item.nome}`).join('<br><br>');
+                } else { listaProdutosHtml = v.itens; /* Vendas legadas */ }
+            }
+
+            let html = `
+                <div style="text-align:center">
+                    <h3 style="margin:0">${tipo === 'cliente' ? 'RECIBO DO CLIENTE' : 'ORDEM DE SEPARACAO'}</h3>
+                    <p style="margin:5px 0">Pedido Nº: ${v.id}</p>
+                    <hr style="border-top:1px dashed #000; border-bottom:none;">
+                </div>
+                <p style="margin:5px 0">Data: ${new Date(v.data).toLocaleString('pt-BR')}</p>
+                <p style="margin:5px 0">Cliente: ${v.cliente}</p>
+                <p style="margin:5px 0">Vendedor: ${v.vendedor || '-'}</p>
+                <hr style="border-top:1px dashed #000; border-bottom:none;">
+                <p style="margin:5px 0"><b>ITENS:</b><br><br>${listaProdutosHtml}</p>
+                <hr style="border-top:1px dashed #000; border-bottom:none;">
+            `;
+
+            if (tipo === 'cliente') {
+                if (v.acres > 0) html += `<p style="margin:5px 0">Acrescimo: R$ ${parseFloat(v.acres).toFixed(2)}</p>`;
+                if (v.desc > 0) html += `<p style="margin:5px 0">Desconto: R$ ${parseFloat(v.desc).toFixed(2)}</p>`;
+                html += `
+                    <h4 style="margin:10px 0; font-size:1.2em;">TOTAL: R$ ${v.total.toFixed(2)}</h4>
+                    <p style="margin:5px 0">Pgto: ${v.pagamento}</p>
+                    <p style="margin:20px 0 5px 0; text-align:center;"><em>Obrigado pela preferencia!</em></p>
+                `;
+            } else {
+                html += `
+                    <br><br><br>
+                    <p style="margin:5px 0; text-align:center;"><em>Assinatura do Conferente:</em></p>
+                    <p style="text-align:center;">___________________________</p>
+                `;
+            }
+
+            document.getElementById('receipt-print').innerHTML = html;
+            window.print();
+        }
+
+        // --- RELATÓRIO AGRUPADO EM LOTE (A4) ---
         function abrirModalImpressaoAgrupada() {
             const checks = document.querySelectorAll('.check-venda:checked');
             if (checks.length === 0) return alert("Selecione pelo menos uma venda.");
@@ -459,7 +537,10 @@
         }
 
         function fecharModalImpressaoAgrupada() { document.getElementById('modal-impressao-agrupada').style.display = 'none'; }
+        
         function confirmarImpressaoAgrupada() {
+            // Remove a trava de 80mm para imprimir o relatório grande corretamente na folha A4
+            document.getElementById('receipt-print').style.width = '100%';
             const htmlRelatorio = document.getElementById('preview-relatorio-agrupado').innerHTML;
             document.getElementById('receipt-print').innerHTML = htmlRelatorio;
             window.print();
@@ -512,7 +593,7 @@
             return html;
         }
 
-        // --- ACERTO DE CONTAS (ATUALIZADO COM FILTRO DE DATA/BUSCA) ---
+        // --- ACERTO DE CONTAS ---
         function setFiltroAcerto(filtro) {
             filtroAcertoAtual = filtro;
             ['Todos', 'A Vencer', 'Vencidos', 'Pagas'].forEach(f => document.getElementById(`f-acerto-${f}`).classList.remove('active'));
@@ -524,7 +605,6 @@
             const tbody = document.getElementById('acerto-table-body');
             const hoje = new Date().toISOString().split('T')[0];
             
-            // Pega os valores dos novos filtros de período e busca
             const busca = (document.getElementById('f-acerto-busca')?.value || '').toLowerCase();
             const inicio = document.getElementById('f-acerto-inicio')?.value;
             const fim = document.getElementById('f-acerto-fim')?.value;
@@ -536,15 +616,10 @@
                 const isVencido = !isPago && v.vencimento < hoje;
                 const isAVencer = !isPago && v.vencimento >= hoje;
                 
-                // Filtro de Status
                 if (filtroAcertoAtual === 'Pagas' && !isPago) return false;
                 if (filtroAcertoAtual === 'Vencidos' && !isVencido) return false;
                 if (filtroAcertoAtual === 'A Vencer' && !isAVencer) return false;
-
-                // Filtro de Busca por Cliente
                 if (busca && !v.cliente.toLowerCase().includes(busca)) return false;
-
-                // Filtro de Período (pelo Vencimento)
                 if (inicio && v.vencimento < inicio) return false;
                 if (fim && v.vencimento > fim) return false;
 
@@ -690,6 +765,8 @@
                 status: 'Ativa', itens: resumoItens 
             };
 
+            let vId = idEdit;
+
             if (idEdit) {
                 const index = db.vendas.findIndex(v => v.id == idEdit);
                 if (index !== -1) { 
@@ -699,9 +776,21 @@
             } else {
                 const novaVenda = { id: db.vendas.length > 0 ? Math.max(...db.vendas.map(v => v.id)) + 1 : 1000, data: new Date().toISOString(), ...baseData };
                 db.vendas.push(novaVenda);
+                vId = novaVenda.id;
             }
 
-            saveDB(); closeSaleModal(); renderSales();
+            saveDB(); 
+            closeSaleModal(); 
+            renderSales();
+
+            // Interação Pós Venda
+            if(!idEdit) {
+                setTimeout(() => {
+                    if(confirm('Venda salva com sucesso!\n\nDeseja imprimir a VIA DO CLIENTE agora?')) {
+                        printReceipt(vId, 'cliente');
+                    }
+                }, 300);
+            }
         }
 
         function cancelSale(id) { if(confirm('Cancelar venda?')) { db.vendas.find(v => v.id === id).status = 'Cancelada'; saveDB(); renderSales(); } }
@@ -711,11 +800,8 @@
             renderProducts(); 
             renderClients(); 
             renderSales(); 
-            
-            // Setar o campo "De" e "Até" default no Acerto de contas como vazio (para mostrar todos inicialmente)
             document.getElementById('f-acerto-inicio').value = '';
             document.getElementById('f-acerto-fim').value = '';
-
             renderAcerto(); 
             document.getElementById('nav-home').classList.add('active-nav');
         };
